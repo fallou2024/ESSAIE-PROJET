@@ -1,0 +1,157 @@
+import tensorflow as tf
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.models import Sequential, load_model
+from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout
+from tensorflow.keras.preprocessing import image
+import numpy as np
+import cv2
+import matplotlib.pyplot as plt
+import logging
+import datetime
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+
+# Parameters
+image_size = (64, 64)
+batch_size = 32
+data_dir = "c:/Users/toshiba/OneDrive/Bureau/NAAL_GOMYCODE/IMAGE_PANNEAU"
+
+# Data Augmentation and Preprocessing
+datagen = ImageDataGenerator(
+    rescale=1./255,
+    validation_split=0.2,
+    rotation_range=20,
+    width_shift_range=0.2,
+    height_shift_range=0.2,
+    shear_range=0.2,
+    zoom_range=0.2,
+    horizontal_flip=True,
+    fill_mode='nearest'
+)
+
+train_data = datagen.flow_from_directory(
+    data_dir,
+    target_size=image_size,
+    batch_size=batch_size,
+    class_mode='categorical',
+    subset='training'
+)
+
+val_data = datagen.flow_from_directory(
+    data_dir,
+    target_size=image_size,
+    batch_size=batch_size,
+    class_mode='categorical',
+    subset='validation'
+)
+
+# Model Definition
+model = Sequential([
+    Conv2D(32, (3,3), activation='relu', input_shape=(64, 64, 3)),
+    MaxPooling2D(2,2),
+    Conv2D(64, (3,3), activation='relu'),
+    MaxPooling2D(2,2),
+    Conv2D(128, (3,3), activation='relu'),
+    MaxPooling2D(2,2),
+    Flatten(),
+    Dense(128, activation='relu'),
+    Dropout(0.5),
+    Dense(len(train_data.class_indices), activation='softmax')  # Number of classes
+])
+
+# Compile the model
+model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+
+# Model Summary
+model.summary()
+
+# Train the model
+epochs = 10  # Number of epochs (can be adjusted)
+history = model.fit(
+    train_data,
+    validation_data=val_data,
+    epochs=epochs
+)
+
+# Save the trained model
+model.save("modele_panneaux.h5")
+logging.info("Model saved as 'modele_panneaux.h5'.")
+
+# Final evaluation
+loss, accuracy = model.evaluate(val_data)
+logging.info(f"Model accuracy: {accuracy * 100:.2f}%")
+
+# Plot training history
+plt.plot(history.history['accuracy'], label='Training Accuracy')
+plt.plot(history.history['val_accuracy'], label='Validation Accuracy')
+plt.title('Model Accuracy')
+plt.ylabel('Accuracy')
+plt.xlabel('Epoch')
+plt.legend()
+plt.show()
+
+plt.plot(history.history['loss'], label='Training Loss')
+plt.plot(history.history['val_loss'], label='Validation Loss')
+plt.title('Model Loss')
+plt.ylabel('Loss')
+plt.xlabel('Epoch')
+plt.legend()
+plt.show()
+
+# Load the trained model for prediction
+model = load_model("modele_panneaux.h5")
+
+# Class labels
+class_labels = list(train_data.class_indices.keys())
+
+# Initialize the webcam
+cap = cv2.VideoCapture(0)
+if not cap.isOpened():
+    logging.error("Error: Could not open webcam.")
+    exit()
+
+frame_count = 0
+while True:
+    ret, frame = cap.read()
+    if not ret:
+        logging.error("Error: Could not read frame.")
+        break
+
+    frame_count += 1
+    if frame_count % 5 != 0:  # Process every 5th frame
+        continue
+
+    # Preprocess the image
+    img = cv2.resize(frame, (64, 64))  # Resize
+    img_array = image.img_to_array(img) / 255.0  # Normalize
+    img_array = np.expand_dims(img_array, axis=0)  # Add batch dimension
+
+    # Prediction
+    prediction = model.predict(img_array)
+    predicted_class = class_labels[np.argmax(prediction)]
+    confidence = np.max(prediction)  # Get the confidence score
+
+    # Display the prediction on the image
+    cv2.putText(frame, f"Panneau: {predicted_class} ({confidence:.2f})",
+                (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+
+    # Show the image
+    cv2.imshow("Detection Panneaux", frame)
+
+    # Save the image with label when 's' key is pressed
+    if cv2.waitKey(1) & 0xFF == ord('s'):
+        # Create filename with timestamp
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"{predicted_class}_{timestamp}.jpg"
+        cv2.imwrite(filename, frame)
+        logging.info(f"Image saved as {filename}")
+
+    # Exit with the 'q' key
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+# Release resources
+cap.release()
+cv2.destroyAllWindows()
+logging.info("Webcam released and all windows closed.")
