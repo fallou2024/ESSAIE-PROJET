@@ -1,0 +1,93 @@
+import pygame
+import numpy as np
+from tensorflow.keras.models import load_model
+from tensorflow.keras.preprocessing import image
+import json
+import os
+import random
+
+# Initialisation Pygame
+pygame.init()
+screen = pygame.display.set_mode((800, 600))
+pygame.display.set_caption("Simulation de Détection de Panneaux")
+clock = pygame.time.Clock()
+
+# Chargement des classes
+with open("class_indices.json", "r") as f:
+    class_indices = json.load(f)
+class_labels = [k for k, v in sorted(class_indices.items(), key=lambda item: item[1])]
+
+# Chargement du modèle
+model = load_model("modele_panneaux.h5")
+
+# Paramètres simulation
+BACKGROUND_COLOR = (100, 100, 100)
+FONT_COLOR = (255, 255, 0)
+
+# Chargement des images de test
+test_images = []
+data_dir = "c:/Users/toshiba/OneDrive/Bureau/NAAL_GOMYCODE/IMAGE_PANNEAU"
+for class_dir in os.listdir(data_dir):
+    full_path = os.path.join(data_dir, class_dir)
+    if os.path.isdir(full_path):
+        for img_file in os.listdir(full_path)[:5]:  # Prendre 5 images par classe
+            img_path = os.path.join(full_path, img_file)
+            img = pygame.image.load(img_path).convert()
+            img_display = pygame.transform.scale(img, (200, 200))
+            img_processed = pygame.transform.scale(img, (64, 64))
+            test_images.append((img_display, img_processed, class_dir))
+
+current_idx = 0
+running = True
+
+while running:
+    # Gestion des événements
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_RIGHT:
+                current_idx = (current_idx + 1) % len(test_images)
+            elif event.key == pygame.K_LEFT:
+                current_idx = (current_idx - 1) % len(test_images)
+
+    # Récupération de l'image courante
+    display_img, process_img, true_class = test_images[current_idx]
+
+    # Préprocessing de l'image
+    img_array = pygame.surfarray.array3d(process_img).swapaxes(0, 1)
+    img_array = image.img_to_array(img_array) / 255.0
+    img_array = np.expand_dims(img_array, axis=0)
+
+    # Prédiction
+    predictions = model.predict(img_array)
+    predicted_class = class_labels[np.argmax(predictions)]
+    confidence = np.max(predictions)
+
+    # Affichage
+    screen.fill(BACKGROUND_COLOR)
+    
+    # Affichage de l'image
+    screen.blit(display_img, (300, 200))
+    
+    # Affichage des informations
+    font = pygame.font.Font(None, 36)
+    texts = [
+        f"Véritable: {true_class}",
+        f"Prédiction: {predicted_class}",
+        f"Confiance: {confidence:.2f}"
+    ]
+    
+    y_pos = 50
+    for text in texts:
+        rendered = font.render(text, True, FONT_COLOR)
+        screen.blit(rendered, (50, y_pos))
+        y_pos += 40
+
+    pygame.display.flip()
+    clock.tick(30)
+
+pygame.quit()
+
+
+
