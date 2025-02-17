@@ -57,3 +57,4 @@ if st.button("Activer la webcam"):
             break
     cap.release()
     cv2.destroyAllWindows()
+    
