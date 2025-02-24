@@ -8,6 +8,7 @@ import cv2
 import matplotlib.pyplot as plt
 import logging
 import datetime
+import os
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -15,7 +16,7 @@ logging.basicConfig(level=logging.INFO)
 # Parameters
 image_size = (64, 64)
 batch_size = 32
-data_dir = "c:/Users/toshiba/OneDrive/Bureau/NAAL_GOMYCODE/IMAGE_PANNEAU"
+data_dir = "c:/Users/toshiba/OneDrive/Bureau/NAAL_GOMYCODE/IMAGE_PANNEAU/traffic_Data"
 
 # Data Augmentation and Preprocessing
 datagen = ImageDataGenerator(
@@ -155,3 +156,18 @@ while True:
 cap.release()
 cv2.destroyAllWindows()
 logging.info("Webcam released and all windows closed.")
+
+import os
+import numpy as np
+
+# Chemin vers ton dataset
+dataset_path = "c:/Users/toshiba/OneDrive/Bureau/NAAL_GOMYCODE/IMAGE_PANNEAU/traffic_Data"  # Mets le bon chemin
+
+# Récupérer la liste des classes (noms des dossiers)
+class_names = sorted(os.listdir(dataset_path))  
+print("Classes trouvées :", class_names)
+
+# Simulation d'une prédiction (exemple : si ton modèle renvoie un indice 2)
+prediction = np.array([0, 0, 1, 0, 0])  # Exemple de sortie du modèle
+predicted_class = np.argmax(prediction)  # Trouver la classe avec la plus haute probabilité
+print("Classe prédite :", predicted_class, "->", class_names[predicted_class])
